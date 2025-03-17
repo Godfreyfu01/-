@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可交互饮酒量与度数图表</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+        #info {
+            margin-top: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="myChart" width="600" height="400"></canvas>
+    <div id="info">饮酒量: 0 ml, 度数: 0 %</div>
+    <script>
+        // 获取canvas和上下文
+        const canvas = document.getElementById('myChart');
+        const ctx = canvas.getContext('2d');
+        const infoDiv = document.getElementById('info');
+
+        // 定义图表参数
+        const padding = 50; // 坐标轴留白
+        const xMin = 0, xMax = 300; // x轴范围：饮酒量 0-300 ml
+        const yMin = 0, yMax = 100; // y轴范围：度数 0-100 %
+
+        // 缩放比例
+        const xScale = (canvas.width - 2 * padding) / (xMax - xMin);
+        const yScale = (canvas.height - 2 * padding) / (yMax - yMin);
+
+        // 直线方程参数：d = m*v + b
+        const m = -13 / 75;
+        const b = 224 / 3;
+
+        // 绘制坐标轴
+        function drawAxes() {
+            ctx.beginPath();
+            // x轴
+            ctx.moveTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            // y轴
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.strokeStyle = 'black';
+            ctx.stroke();
+
+            // 标注
+            ctx.fillText('贺金澜饮酒量 (ml)', canvas.width / 2, canvas.height - 10);
+            ctx.save();
+            ctx.translate(10, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('度数 (%)', 0, 0);
+            ctx.restore();
+        }
+
+        // 绘制直线
+        function drawLine() {
+            // 计算直线与边界交点
+            const xAtY0 = (yMin - b) / m; // d = 0
+            const xAtY100 = (yMax - b) / m; // d = 100
+
+            let startX = Math.max(xMin, Math.min(xMax, xAtY100));
+            let endX = Math.max(xMin, Math.min(xMax, xAtY0));
+            let startY = m * startX + b;
+            let endY = m * endX + b;
+
+            // 转换为canvas坐标
+            const canvasStartX = padding + (startX - xMin) * xScale;
+            const canvasStartY = canvas.height - padding - (startY - yMin) * yScale;
+            const canvasEndX = padding + (endX - xMin) * xScale;
+            const canvasEndY = canvas.height - padding - (endY - yMin) * yScale;
+
+            ctx.beginPath();
+            ctx.moveTo(canvasStartX, canvasStartY);
+            ctx.lineTo(canvasEndX, canvasEndY);
+            ctx.strokeStyle = 'blue';
+            ctx.stroke();
+        }
+
+        // 绘制可拖动点
+        function drawPoint(x, y) {
+            const canvasX = padding + (x - xMin) * xScale;
+            const canvasY = canvas.height - padding - (y - yMin) * yScale;
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+        }
+
+        // 初始点位置（饮酒量 200ml）
+        let currentV = 200;
+        let currentD = m * currentV + b;
+
+        // 绘制整个图表
+        function drawChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawAxes();
+            drawLine();
+            drawPoint(currentV, currentD);
+            infoDiv.textContent = `饮酒量: ${currentV.toFixed(2)} ml, 度数: ${currentD.toFixed(2)} %`;
+        }
+
+        // 初始绘制
+        drawChart();
+
+        // 拖动状态
+        let dragging = false;
+
+        // 鼠标按下事件
+        canvas.addEventListener('mousedown', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            // 检查是否点击在点上
+            const canvasCurrentX = padding + (currentV - xMin) * xScale;
+            const canvasCurrentY = canvas.height - padding - (currentD - yMin) * yScale;
+            const dx = mouseX - canvasCurrentX;
+            const dy = mouseY - canvasCurrentY;
+            if (dx * dx + dy * dy < 25) { // 5px 半径
+                dragging = true;
+            }
+        });
+
+        // 鼠标移动事件
+        canvas.addEventListener('mousemove', function(event) {
+            if (dragging) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+
+                // 将鼠标位置转换回饮酒量
+                currentV = xMin + (mouseX - padding) / xScale;
+                currentV = Math.max(xMin, Math.min(xMax, currentV));
+                currentD = m * currentV + b;
+
+                // 确保度数在范围内
+                if (currentD < yMin) {
+                    currentD = yMin;
+                    currentV = (currentD - b) / m;
+                } else if (currentD > yMax) {
+                    currentD = yMax;
+                    currentV = (currentD - b) / m;
+                }
+
+                drawChart();
+            }
+        });
+
+        // 鼠标松开事件
+        canvas.addEventListener('mouseup', function() {
+            dragging = false;
+        });
+    </script>
+</body>
+</html>
